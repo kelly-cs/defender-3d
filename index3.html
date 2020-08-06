@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Project 2 - Defender</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #000;
+				color: #fff;
+				margin: 0px;
+				overflow: hidden;
+				cursor:url(http://www.aceverything.com/cskelly/project2/models/crosshair.png) 25 25, auto;
+			}
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display:block;
+				 
+			}
+			#info a, .button { color: #f00; font-weight: bold; text-decoration: underline; cursor: pointer }
+			
+			#overlay {
+			  -webkit-user-select: none;  
+			-moz-user-select: none;     
+			-ms-user-select: none;     
+			position: absolute;
+			left: 100px;
+			top: 0px;
+			font-family: "Verdanda", Sans;
+			font-size: 30px;
+			padding: 1em;
+			color: white;
+			}
+			
+			#mainmenu {  
+						  -webkit-user-select: none;  
+			-moz-user-select: none;     
+			-ms-user-select: none;     
+			color: #fff;
+			position: absolute;
+			top: 100px;
+			width: 100%;
+			text-align: center;
+			z-index: 100;
+			display:block;
+			text-align: center;
+			font-family: "Courier New", Monospace;
+			font-size: 30px;
+			padding: 1em;
+			color: white;
+			}
+			
+			#tips {  
+						  -webkit-user-select: none;  
+			-moz-user-select: none;     
+			-ms-user-select: none;     
+			color: green;
+			position: absolute;
+			top: 100px;
+			width: 100%;
+			text-align: center;
+			z-index: 100;
+			display:block;
+			text-align: center;
+			font-family: "Courier New", Monospace;
+			font-size: 30px;
+			padding: 1em;
+			color: white;
+			}
+		</style>
+	</head>
+
+	<body onkeydown="keypress(event)"; onclick="fire(); resetlight(); first_shot();"; onmousedown="inter=setInterval(fire, 100); gunfire();" onmouseup="clearInterval(inter); clear_first_shot();">
+		<div id="info"></div>
+		<div id="tips"></div>
+		<div id="mainmenu"> 
+		<h1>DEFENDER</h1>
+		<h2><i>by Christopher Kelly & Owen Tang</i></h2>
+		<p>Defend your fort until help arrives...</p>
+		
+			<div>
+			<button id="startgame" onclick="init()">
+				Start Game
+				</button>
+			</div>
+		<img src="models/defender.gif">
+		</div>
+		
+		
+		<div id="overlay">
+			<div>Score: <span id="score"></span></div>
+		</div>
+		
+		<audio id="music" loop="loop">
+			<source src="sound/dunes.mp3" type="audio/mpeg"/>
+		</audio>
+		
+		<script type="application/x-glsl" id="light-vertex">
+			attribute vec4 vertexPosition;
+			unfirom mat4 M;
+		
+			uniform vec3 p0;
+			uniform vec3 p1;
+			uniform vec3 a0;
+			uniform vec3 a1;
+			
+			uniform float orthIsOn;
+			uniform float alpha;
+			
+			uniform vec3 Ia, Id, Is;
+			uniform vec3 Ia2, Id2, Is2;
+			
+			uniform vec3 ka, kd, ks;
+			
+			varying vec3 R;
+			void Main() {
+				gl_PointSize = 1.0;
+				
+				vec4 vertexPositionTransformed = M * vertexPosition;
+			
+				vec4 nv4 = vec4( nv.x, nv.y, nv.z, 1.0);
+				vec4 nv4transformed = M_inversetranspose * nv4;
+				vec3 nvtransformed = normalize(nv4transformed.xyz);
+				
+				//Reflection for p light 1
+				float distance = length(p0 - vertexPositionTransformed.xyz);
+				float a = .00005;
+				float b = .0;
+				float c = .0;
+				float scalefactor = a * distance * distance + b * distance + c;
+				
+				//Reflection for p light 2
+				float distance2 = length(p1 - vertexPositionTransformed.xyz);
+				float a2 = .00005;
+				float b2 = .0;
+				float c2 = .0;
+				float scalefactor2 = a2 * distance2 * distance2 + b2 * distance2 + c2;
+				float spotlight_axis_u;
+				
+				vec3 Ia_pp0 = Ia / scalefactor;
+				vec3 Id_pp0 = Id / scalefactor;
+				vec3 Is_pp0 = Is / scalefactor;
+				
+				vec3 Ia_pp1 = (Ia2 / scalefactor2);
+				vec3 Id_pp1 = (Id2 / scalefactor2);
+				vec3 Is_pp1 = (Is2 / scalefactor2);
+				
+				vec3 Ra, Rd, Rs;
+				vec3 Ra2, Rd2, Rs2;
+				
+				//Ambient reflection 1
+				Ra.r = ka.r * Ia_pp0.r;
+				Ra.g = ka.g * Ia_pp0.g;
+				Ra.b = ka.b * Ia_pp0.b;
+				
+				//Ambient reflection light 2
+				Ra2.r = ka2.r * Ia_pp1.r;
+				Ra2.g = ka2.g * Ia_pp1.g;
+				Ra2.b = ka2.b * Ia_pp1.b;
+				
+				//Diffuse Reflection 1
+				float costheta = dot(i,nvtransformed);
+				Rd.r = kd.r * Id_pp0.r * max(costheta,0.0);
+				Rd.g = kd.r * Id_pp0.g * max(costheta,0.0);
+				Rd.b = kd.r * Id_pp0.b * max(costheta,0.0);
+				
+				//Diffuse Reflection 2
+				float costheta2 = dot(i2,nvtransformed);
+				Rd2.r = kd2.r * Id_pp1.r * max(costheta2,0.0);
+				Rd2.g = kd2.r * Id_pp1.g * max(costheta2,0.0);
+				Rd2.b = kd2.r * Id_pp1.b * max(costheta2,0.0);
+				
+				//Specular Reflections 1 and 2
+				// Reflection vector
+				vec3 r = 2.0 * costheta * nvtransformed - i;
+				vec3 r2 = 2.0 * costheta2 * nvtransformed - i2;
+				
+				// View vector
+				vec3 view = normalize(vec3(.0,.0,.0)-vertexPositionTransformed.xyz);
+				//cosphi1 contains dot product between reflection vector
+				// and view vector
+				float cosphi = dot(r,view);
+				float cosphi2 = dot(r2,view);
+				float shine = pow( max( cosphi, 0.0 ), alpha );
+				float shine2 = pow( max( cosphi2, 0.0 ), alpha2);
+				float account;
+				float account2;
+				
+				if ( costheta > 0.0 ) {
+					account = 1.0;
+				} else {
+					account = 0.0;
+				}
+				
+				if ( costheta2 > 0.0 ) {
+					account2 = 1.0;
+				} else {
+					account2 = 0.0;
+				}
+				
+				Rs.r = ks.r * Is_pp0.r * shine * account;
+				Rs.g = ks.g * Is_pp0.g * shine * account;
+				Rs.b = ks.b * Is_pp0.b * shine * account;
+				
+				Rs2.r = ks2.r * Is_pp1.r * shine2 * account2;
+				Rs2.g = ks2.g * Is_pp1.g * shine2 * account2;
+				Rs2.b = ks2.b * Is_pp1.b * shine2 * account2;
+			
+				// Add all the ambient, diffuse, and specular reflections from all the light sources together
+				R = clamp(Ra + Ra2 + Rs + Rs2 + Rd + Rd2, 0.0, 1.0);
+			
+				if ( orthIsOn > 0.5) {
+					gl_Position = P_orth * vertexPositionTransformed;
+				} else{
+					gl_Position = P_persp * vertexPositionTransformed;
+				}
+			}
+		</script>
+		
+		<script type="application/x-glsl" id="light-fragment">
+			precision mediump float;
+			varying vec3 R;
+			void main() {
+				gl_FragColor = vec4(R.r, R.g, R.b, 1.0 );
+			}
+		</script>
+		
+		<script type="application/x-glsl" id="sky-vertex">  
+		// VERTEX SHADER FOR THE SKY
+			varying vec2 vUV;
+
+			void main() {  
+			  vUV = uv;
+			  vec4 pos = vec4(position, 1.0);
+			  gl_Position = projectionMatrix * modelViewMatrix * pos;
+			}
+			</script>
+
+			
+			
+			
+		<script type="application/x-glsl" id="sky-fragment">  
+		// FRAGMENT SHADER FOR SKY
+		uniform sampler2D texture;  
+		varying vec2 vUV;
+
+		void main() {  
+		  vec4 sample = texture2D(texture, vUV);
+		  gl_FragColor = vec4(sample.xyz, sample.w);
+		}
+		</script>  
+
+		<script src="build/three.js"></script>
+
+		<script type="text/javascript" src="Common/webgl-utils.js"></script>
+		<script type="text/javascript" src="Common/initShaders.js"></script>
+		<script type="text/javascript" src="Common/MV.js"></script>
+				
+		<script src="js/loaders/DDSLoader.js"></script>
+		<script src="js/loaders/MTLLoader.js"></script>
+		<script src="js/loaders/OBJLoader.js"></script>
+
+		<script src="js/loaders/Detector.js"></script>
+		<script src="js/loaders/Projector.js"></script>
+		<script src="js/libs/stats.min.js"></script>
+		<script src="js/loaders/Color.js"></script>
+
+		<script>
+			var callbackcount = 0;
+			var gameover = false;
+			var container, stats;
+			var global_m60; // because it will NOT work unless I do this
+			var global_enemy_1;
+			var projector = new THREE.Projector();
+			var moving = false; // is the crosshair currently moving?
+			var firstclick = true; // whether or not the left click is being held down or just pressed once.
+			var gamestarted = false; //Is the game started yet?
+
+			var light; // for firing guns
+			var camera, scene, renderer;
+			
+			var mouse = new THREE.Vector3();
+			var mouseX = 0, mouseY = 0;
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			var difficulty = 1.00;
+			var framecount = 0; // master framecount, does not get changed.
+			var framecount_temporary = 0; //temporary frame count used for timing stuff
+			var score = 0;
+			
+			var music = document.getElementById("music"); 
+			music.volume = .3;
+			var muted = false; // Is the music muted? Default is FALSE.
+			
+			
+			//var enemy_id = 0; // keeps an increasing number for identifying enemies by ID. Required to fix a removal bug.
+			var max_tanks = 5;
+			var enemy_tanks = [];
+			var tank_default_hp = 20;
+			
+			var last_x = 0; // These are patches for the phenomenon where firing and not moving the mouse would cause the 
+			var last_y = 0; // mouse.x and mouse.y to revert to 0. No idea why that's happening.
+			
+			var scene; // making scene global so it can be accessed by a createTank() function.
+			//sounds
+			
+			
+			//init();
+			//animate();
+
+
+			function init() {
+					music.play();
+					
+				document.getElementById("mainmenu").textContent="";
+/* DEFENDER 
+By Christopher Kelly & Owen Tang
+Clarkson University - Spring 2017
+
+TENTATIVE DOCUMENTATION:
+This is a defense style game that requires the player to point a weapon at oncoming enemies
+in 3D space. It is aimed to illustrate a realistic environment (as possibly as it can be at the moment).
+There are multiple polyhedra, in the form of enemies, weapons, and static scene objects. The weapon, sandbags,
+and enemies make up the polyhedra on the scene. Furthermore, these are all very distinct objects, or 'pieces'.
+
+INTERACTIVITY:
+The player's gun moves in response to mouse location, to allow the player to  "aim" at oncoming
+opponents. This is achieved with raycasting provided by THREEJS. Clicking/holding left mouse will fire
+and damage enemies that are aimed at. Once damaged enough, enemies disappear. 
+
+LIGHTS:
+
+In order to render this, three scenes are made. One scene is for drawing enemies, another is for
+the sandbags inbetween the enemies and the player, while the other
+is for drawing the player's weapon and nearby items. This allows us to manipulate the depth
+of the objects in each scene separately, and make it look more believable.
+
+Because these are in separate scenes, different lights are made for each scene. One is made for
+the "enemy" scene, one for the "sandbag" scene, and one is made for the player scene. 
+
+TEXTURES:
+There are a variety of textures in this game. A list may include, but not be limited to, the ground
+texture, sky texture, sandbag textures, and other extra textures.
+
+PROJECTION:
+The scene is displayed through a perspective projection camera.
+
+CONTROLS:
+The only control is LEFTMOUSE. Aim at oncoming enemies, and click to fire at them. Over time enemies
+become stronger.
+
+WIN CONDITION:
+There is currently no win condition. The goal is to survive as long as possible.
+
+
+KNOWN BUGS:
+If you hold down LEFTMOUSE for continuous fire, and drag off of the window and release (near the URL 
+bar), the weapon will continue firing. Once this is done it cannot be stopped. Furthermore, if you
+click back into the window while this is occurring, you can fire twice. This process can get repeated
+so the firing process overlaps over and over. Need to fix!
+
+The raycaster damages ALL objects within the aiming area, not just the closest one. This means all objects
+in a given area will be damaged regardless of where they are relative to the player. This can be changed by
+editing the intercept array in the fire function and utilizing a for loop of only 2 elements, as one tends to 
+be the floor usually. This would remedy the problem to near undetectable proportions.
+
+REFERENCES CONSULTED:
+http://stackoverflow.com/questions/43728072/raycaster-not-detecting-certain-objects-threejs
+http://stackoverflow.com/questions/26909633/gl-modelviewmatrixinversetranspose-in-threejs
+http://threejs.org/
+
+EXTERNAL FILES/RESOURCES:
+ThreeJS - www.threejs.org
+Ultimate Tank - https://clara.io/view/0a3abdfc-e24b-4e55-b9a1-b3da5e0db665
+M60 - Unknown Origin
+Sandbags - https://www.yobi3d.com/q/free-3d-file-sandbag
+Serious Sam OST - Croteam
+Sand Texture - Unknown Origin
+Sky Texture - Unknown Origin
+
+SEE README FOR MORE INFO
+
+*/
+//*********************************************************************************************************************************************************************************************
+//RUBRIC REQUIREMENT SECTION
+//THESE ARE MANUAL FUNCTIONS MEANT TO SATISFY RUBRIC REQUIREMENTS FOR:
+//PROJECTION CAMERA + LIGHTING
+//EXPLANATION:
+//The calculations for the projection matrix / camera are done here. HOWEVER, IN ORDER
+//TO ADD THIS TO THE SCENE, A THREEJS CAMERA IS STILL REQUIRED. Doing otherwise goes beyond the
+//intended operation of ThreeJS and is not practical or robust in this situation.
+//
+// These operations create a camera at (0,0,250) facing (0,0,0). 
+// The results will be sent to ThreeJS.
+//
+// Because we got involved in a ThreeJS implementation, we did not initially know of 
+// extracting triangles/vertices from OBJ files. Attempts at loading our files into Meshlab and getting
+// this data, or getting provided code examples to work failed. As such, some function are going to be utilizing
+// ThreeJS instead of external vertex/fragment shaders or calculations. However, as requested, the CAMERA and 
+// LIGHTING will be calculated, as this data can be passed into ThreeJS in a manner similar to
+// previous assignments.
+//
+					// Modelview matrix (look at method)
+					var e = vec3( 0.0, 0.0, 250.0 ); //eye
+					var a = vec3( 0.0, 0.0, 0.0 ); // at point
+					var vup = vec3( 0.0, 1.0, 0.0); // up vector
+					var n = normalize( vec3( e[0]-a[0], e[1]-a[1], e[2]-a[2]));
+					var u = normalize(cross(vup,n));
+					var v = normalize(cross(n,u));
+					var modelviewMatrix = [u[0], v[0], n[0], 0.0,
+										u[1], v[1], n[1], 0.0,
+										u[2], v[2], n[2], 0.0,
+										-u[0]*e[0]-u[1]*e[1]-u[2]*e[2],
+										-v[0]*e[0]-v[1]*e[1]-v[2]*e[2],
+										-n[0]*e[0]-n[1]*e[1]-n[2]*e[2], 1.0];
+										
+					// Modelview inverse transpose
+					var modelviewMatrixInverseTranspose = [u[0], v[0], n[0], e[0],
+													u[1], v[1], n[1], e[1],
+													u[2], v[2], n[2], e[2],
+													0.0, 0.0, 0.0, 1.0];
+													
+					//Projection Matrix
+					var left = -window.innerWidth;
+					var right = window.innerWidth;
+					var top_ = window.innerHeight;
+					var bottom = -window.innerHeight;
+					var near = 1;
+					var far = 2000.0;
+					
+					
+					// Perspective Projection Matrix
+					var perspectiveProjectionMatrix =
+						[2.0*near/(right-left), .0, .0, .0,
+						.0, 2.0*near/(top_-bottom), .0, .0,
+						(right+left)/(right-left), (top_+bottom)/(top_-bottom), -(far+near)/(far-near), -1.0,
+						.0, .0, -2.0*far*near/(far-near), .0];
+		
+		
+		
+				//ADD LIGHTS
+				
+				var p0loc;
+				
+				//END OF RUBRIC REQUIREMENT SECTION
+				//****************************************************************************************************************************
+			
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 2000 ); // default values
+				camera.ProjectionMatrix = perspectiveProjectionMatrix;
+				camera.updateProjectionMatrix(); // HERE WE ARE APPLYING THE NEW PROJECTION MATRIX WE CALCULATED.
+				camera.position.z = 250;
+				
+
+				// scene
+
+				scene = new THREE.Scene();
+				sandbag_scene = new THREE.Scene(); // sandbag / other things, shown between scene and scene2
+				scene2 = new THREE.Scene(); // gun is held here
+
+
+				var ambient = new THREE.AmbientLight( 0x444444 );
+				scene.add( ambient );
+
+				//var ambient2 = new THREE.AmbientLight( 0xFFFFFF );
+				//scene2.add( ambient2 );
+				
+				var ambient3 = new THREE.AmbientLight( 0xFFFFFF );
+				sandbag_scene.add( ambient3 );
+				
+				var directionalLight = new THREE.DirectionalLight( 0xffeedd );
+				directionalLight.position.set( 0, 0.5, 0.5 ).normalize();
+				scene.add( directionalLight );
+				
+				// FIRING GUNS
+				light = new THREE.PointLight( 0xfbff15, 0, 15 );
+				light.intensity = 0;
+				light.position.set(0,0,250)
+				sandbag_scene.add( light );
+				
+				light2 = new THREE.PointLight( 0xfbff15, 0, 150 );
+				light2.intensity = 0;
+				scene2.add( light2 );
+				
+				// sky
+					var geometry = new THREE.SphereGeometry(400, 100, 100);  
+					var uniforms = {  
+					  texture: { type: 't', value: THREE.ImageUtils.loadTexture('models/sandsky.jpg') }
+					};
+
+					var material = new THREE.ShaderMaterial( {  
+					  uniforms:       uniforms,
+					  vertexShader:   document.getElementById('sky-vertex').textContent,
+					  fragmentShader: document.getElementById('sky-fragment').textContent
+					});
+
+					skyBox = new THREE.Mesh(geometry, material);  
+					skyBox.scale.set(-1, 1, 1);  
+					skyBox.eulerOrder = 'XZY';  
+					skyBox.renderDepth = 1000.0;  
+					scene.add(skyBox); 
+						
+				// floor
+					var floorTexture = new THREE.ImageUtils.loadTexture( 'models/sand.jpg' );
+					floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
+					floorTexture.repeat.set( 10, 10 );
+					var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+					var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 10, 10);
+					var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+					floor.position.y = -10;
+					floor.rotation.x = Math.PI / 2;
+					floor.name = "floor";
+					scene.add(floor);
+					
+					
+				// model
+
+				var onProgress = function ( xhr ) {
+					if ( xhr.lengthComputable ) {
+						var percentComplete = xhr.loaded / xhr.total * 100;
+						console.log( Math.round(percentComplete, 2) + '% downloaded' );
+						// set this to a thing on the page later
+					}
+				};
+
+				var onError = function ( xhr ) { };
+
+				THREE.Loader.Handlers.add( /\.dds$/i, new THREE.DDSLoader() );
+
+				
+
+				
+				// PLAYER GUN/ITEM SCENE STUFF
+
+
+				
+				var mtlLoader = new THREE.MTLLoader();
+				//mtlLoader.setPath( 'obj/male02/' );
+				mtlLoader.load( 'M60.obj', function( materials ) { 
+
+					materials.preload();
+
+					var objLoader = new THREE.OBJLoader();// load the geometry of bus.obj
+					console.log("here");
+					objLoader.setMaterials( materials );
+					objLoader.load( "M60.obj ", function ( object ) {
+						var len = object.children.length;  //get the number of children if your object contains
+
+						vertices = [];
+						indexList = [];
+						var numTriangles;
+						
+						var m60Verts = [];
+						var m60Index = [];
+						var vertexNormals = [];
+						var textureCoordinates = [];
+						for(var i=0; i<len; i++){
+									   
+							// access the information related to geometry
+							var geometry = object.children[i].geometry;
+						 
+							// access the vertices
+							var vertices_array = geometry.attributes.position.array;
+							
+							var m60Tri = vertices_array.length/3;//get the number of faces because each face is a triangle
+							for(var j=0; j<m60Tri; j++){
+								// 'vertices' stores the coordinates of vertices of the object
+								m60Verts.push( vec4(vertices_array[3*j],vertices_array[3*j+1],vertices_array[3*j+2],1));
+									   
+								m60Index.push( 3*j );
+								m60Index.push( 3*j+1 );
+								m60Index.push( 3*j+2 );
+								
+							 }
+						}
+						
+						object.position.y = - 150;
+						object.position.z = 30;
+						global_m60 = object;
+						global_m60.renderOrder = 99999;
+						global_m60.depthTest = false;
+						scene2.add( global_m60 );
+						
+						console.log("here1");
+						continueExecution();
+						var m60Face = getFaceNormals( m60Verts, m60Index, m60Tri );
+						console.log(m60Face);
+						console.log(m60Face);
+						
+					}, onProgress, onError );
+					
+					
+				});
+				
+				//
+			
+				
+				var mtlLoader2 = new THREE.MTLLoader();
+				mtlLoader2.setPath('models/');
+				mtlLoader2.load( 'sandbags.mtl', function( materials_sandbags ) {
+
+					materials_sandbags.preload();
+
+					var objLoader = new THREE.OBJLoader();
+					objLoader.setMaterials( materials_sandbags );
+					objLoader.setPath( 'models/' );
+					objLoader.load( 'sandbags.obj', function ( object_sandbags ) {
+
+						object_sandbags.position.y = -1;
+						object_sandbags.position.z = 245;
+						object_sandbags.rotateX(3.014);
+						object_sandbags.rotateZ(-1.55);
+						object_sandbags.rotateY(-1.514);
+						sandbag_scene.add( object_sandbags );
+						
+
+					}, onProgress, onError );
+
+				});
+				
+				
+				
+				
+				
+
+ /*			// ENEMIES
+				mtlLoader.setPath('models/');
+				
+				for(i = 0; i < max_tanks; ++i){
+				mtlLoader.load( 'ultimate-tank.mtl', function( materials2 ) {
+
+					//materials2.needsUpdate = true;
+					materials2.preload();
+
+					var objLoader = new THREE.OBJLoader();
+					objLoader.setMaterials( materials2 );
+					//objLoader.setPath( 'obj/male02/' );
+					objLoader.load( 'models/ultimate-tank.obj', function ( object2 ) {
+						
+						object2.position.x = (Math.random()*30)-15;
+						x = object2.position.x;
+						object2.position.y = -1;
+						object2.position.z = 220;
+						object2.userData.HP = 50 ;
+						//object2.position.y = -95;
+						global_enemy_1 = object2;
+						angle = 1.5708 - Math.atan(x/30);
+						console.log(angle);
+						global_enemy_1.rotateY(angle);
+
+						//global_enemy_1.renderOrder = 1;
+						enemy_tanks.push(global_enemy_1);
+						scene.add( global_enemy_1 ); // THIS HAS TO BE DONE LIKE THIS.
+						//global_enemy_1.material.color.set( 0xff0000 ); THIS DOESNT WORK...
+	
+						
+
+					}, onProgress, onError );
+
+				}); 
+				} */
+
+
+				//
+
+				renderer = new THREE.WebGLRenderer();
+				renderer.autoClear = false;
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+				//
+
+				window.addEventListener( 'resize', onWindowResize, false );
+				gamestarted = true;
+				animate();
+				
+			} // END OF INIT FUNCTION.
+
+			function onWindowResize() {
+
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function onDocumentMouseMove( event ) {
+				
+				moving = true;
+
+				mouseX = ( event.clientX - windowHalfX ) / 2;
+				mouseY = ( event.clientY - windowHalfY ) / 2;
+				mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+				mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+				mouse.z = 0.5;
+				
+				if(firstclick){
+				last_x = mouse.x;
+				last_y = mouse.y;
+				}
+			}
+			//
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+				render();
+
+			}
+
+			function render() {
+				if(!gameover){
+				//console.log(object.position);
+				// LATER: IMPLEMENT NICER GUN ANIMATION ?
+				global_m60.position.x += ( mouseX - global_m60.position.x ) * .45;
+				if(-mouseY < 1){
+				global_m60.position.y += ( - mouseY - global_m60.position.y ) * .45;
+				}
+				else{
+				global_m60.position.y = 1;
+				}
+				
+				for(i = 0; i < enemy_tanks.length ; ++i){
+					enemy_tanks[i].position.z += .02;
+					if (enemy_tanks[i].position.x >= .0){
+						enemy_tanks[i].position.x -= enemy_tanks[i].userData.initialXSpawn/4800;
+					} else if (enemy_tanks[i].position.x < .0){
+						enemy_tanks[i].position.x += -enemy_tanks[i].userData.initialXSpawn/4800;
+					}
+				}
+				
+				// check if anyone is too close to the player
+				
+				for(i = 0; i < enemy_tanks.length ; ++i){
+					if(enemy_tanks[i].position.z > 246)
+					gameover = true;
+					document.getElementById("score").textContent= score + " GAME OVER ";
+				}
+				//camera.position.x += ( mouseX - camera.position.x ) * .05;
+				//camera.position.y += ( - mouseY - camera.position.y ) * .05;
+
+				// PRINT TIPS TO THE PLAYER WHILE THEY'RE PLAYING:
+				if(framecount > 150){
+					document.getElementById("tips").textContent="Hold LEFT MOUSE to fire.";
+				} 
+				if(framecount > 350){
+					document.getElementById("tips").textContent="";
+				}
+				if(framecount > 1000){
+					document.getElementById("tips").textContent="Enemies get stronger over time. Good luck!";
+				}
+				if(framecount > 1250){
+					document.getElementById("tips").textContent="";
+				}
+				if(framecount > 1500){
+					document.getElementById("tips").textContent="Music can be toggled with (M).";
+				}
+				if(framecount > 1700){
+					document.getElementById("tips").textContent="";
+				}
+				//camera.lookAt( scene.position );
+				//*********************************************************************************
+				//*****WE ARE NOT USING THE LOOKAT METHOD BUILT IN. WE HAVE DONE IT MANUALLY. *****
+				//*********************************************************************************
+				
+				renderer.clear();
+				renderer.render( scene, camera );
+				renderer.clearDepth();
+				renderer.render( sandbag_scene, camera );
+				renderer.clearDepth();
+				renderer.render( scene2, camera );
+				framecount += 1;
+				framecount_temporary += 1;
+				if(framecount_temporary > 200){
+				difficulty += 0.01;
+					createTank(tank_default_hp * difficulty);
+					framecount_temporary = 0;
+				}	
+				console.log(moving);
+				moving = false;
+					if(!gameover){
+				    document.getElementById("score").textContent=score;
+					}
+				
+				} // if not gameover
+			}
+			
+			function fire( ) { 
+			
+			
+			if(!gameover && gamestarted){
+				// some weird decay was happening when you held the left click down, this should remedy it
+				
+				if(!moving){
+						mouse.x = last_x;
+						mouse.y = last_y;
+					}
+					console.log(mouse.x);
+					console.log(last_x);
+					console.log(mouse.y);
+					console.log(last_y);
+					
+				
+				
+				
+			var m60_sound = new Audio("sound/M60.mp3");
+			m60_sound.volume = .4;
+			m60_sound.play();
+			console.log("FIRING ONE BLAST!");
+				if (light.intensity == 0) {
+					light.intensity = 0.3;
+					light2.position.set(global_m60.position.x,global_m60.position.y,25)
+					light2.intensity = 0.5;
+				} else{
+					light.intensity = 0;
+					light2.intensity = 0;
+				}
+				
+				// collide with enemies
+
+				
+				projector.unprojectVector( mouse, camera );   
+				mouse.sub( camera.position );                
+				mouse.normalize();
+				var raycaster = new THREE.Raycaster( camera.position, mouse );
+				var intersects = raycaster.intersectObjects( scene.children, true );
+				for( var i = 0; i < intersects.length; ++i ){
+					//intersects[i].object.material.color.set( 0xff0000 );
+					if(intersects[i].object.name != "floor"){ // dont shoot the floor THIS WORKS
+						if(intersects[i].object.parent.userData.HP > 0){
+						intersects[i].object.material.map = THREE.ImageUtils.loadTexture("models/red_checkerboard.jpg");
+						intersects[i].object.material.needsUpdate = true;
+						//scene.remove(intersects[i]);
+						console.log(intersects[i].object.parent.name);
+						console.log(intersects[i].object.parent.userData.HP);
+						intersects[i].object.parent.userData.HP += -1;
+						break;
+						} else{
+						var temp_index = enemy_tanks.indexOf(intersects[i].object.parent);
+						console.log("INDEX");
+						console.log(temp_index);
+						scene.remove(enemy_tanks[temp_index]);
+						enemy_tanks.splice(temp_index, 1);	
+						score+=10;
+						break;
+						}
+						
+					}
+				}
+			}
+		}
+	
+			
+			function createTank( hp_value ) {
+			// SPAWNNS A TANK.
+				
+					// ENEMIES
+				var mtlLoader = new THREE.MTLLoader();
+				mtlLoader.setPath('models/');
+				mtlLoader.load( 'ultimate-tank.mtl', function( materials2 ) {
+
+					//materials2.needsUpdate = true;
+					materials2.preload();
+
+					var objLoader = new THREE.OBJLoader();
+					objLoader.setMaterials( materials2 );
+					//objLoader.setPath( 'obj/male02/' );
+					objLoader.load( 'models/ultimate-tank.obj', function ( object2 ) {
+						
+						object2.position.x = (Math.random()*150)-75;
+						x = object2.position.x;
+						object2.position.y = -1;
+						object2.position.z = 150;
+						object2.userData.HP = hp_value ;
+						object2.userData.initialXSpawn = object2.position.x;
+						//object2.position.y = -95;
+						global_enemy_1 = object2;
+						angle = 1.5708 - Math.atan(x/131);
+						console.log(angle);
+						global_enemy_1.rotateY(angle);
+						//global_enemy_1.renderOrder = 1;
+						enemy_tanks.push(global_enemy_1);
+						scene.add( global_enemy_1 ); // THIS HAS TO BE DONE LIKE THIS.
+						//global_enemy_1.material.color.set( 0xff0000 ); THIS DOESNT WORK...
+	
+						
+
+					});
+
+				}); 
+				
+			}
+			function getFaceNormals( vertices, indexList, numTriangles ) {
+				var faceNormals=[];
+				//Iterate through all the triangles
+				for (var i = 0; i < numTriangles; i++) {
+					//For each triangle, get the three vertices of the triangle
+					var p0 = vec3( vertices[indexList[3*i]][0],
+									vertices[indexList[3*i]][1],
+									vertices[indexList[3*i]][2] );
+					var p1 = vec3( vertices[indexList[3*i+1]][0],
+									vertices[indexList[3*i+1]][1],
+									vertices[indexList[3*i+1]][2] );
+					var p2 = vec3( vertices[indexList[3*i+2]][0],
+									vertices[indexList[3*i+2]][1],
+									vertices[indexList[3*i+2]][2] );
+					var p1minusp0 = vec3( p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2]);
+					var p2minusp0 = vec3( p2[0]-p0[0], p2[1]-p0[1], p2[2]-p0[2]);
+					var faceNormal = cross( p1minusp0, p2minusp0 );
+					faceNormal = normalize(faceNormal);
+					faceNormals.push( faceNormal );
+					
+				}
+				
+				return faceNormals;
+			}
+
+			function getVertexNormals( vertices, indexList, faceNormals, numVertices, numTriangles ) {
+				var vertexNormals=[];
+				for (var j = 0; j < numVertices; j++ ) {
+					var vertexNormal = vec3( 0, 0, 0 );
+					for (var i = 0; i < numTriangles; i++) {
+						if (indexList[3*i] == j |
+							indexList[3*i+1] == j |
+							indexList[3*i+2] == j ) {
+							vertexNormal[0] = vertexNormal[0] + faceNormals[i][0];
+							vertexNormal[1] = vertexNormal[1] + faceNormals[i][1];
+							vertexNormal[2] = vertexNormal[2] + faceNormals[i][2];
+						}
+					}
+					
+					vertexNormal = normalize(vertexNormal);
+					vertexNormals.push( vertexNormal );
+				}
+				
+				return vertexNormals;
+			}
+
+			function continueExecution() {
+				if (callbackcount < 1 ) {
+					// ... which is checked here. If the callback counter is not updated, the function times out, and re-starts.
+					setTimeout( continueExecution, 1000 );
+					return;
+				}
+				
+				// regular execution proceeds from here. This function does end up blocking the GUI, but for our simple purposes
+				// it suffices. More information about this can be found on the following page, if you scroll further down.
+				// JavaScript enthusiasts may feel free to pursue other routes.
+				http://stackoverflow.com/questions/10004112/how-can-i-wait-for-set-of-asynchronous-callback-functions
+				console.log(vertices);
+				console.log(indexList);
+			}
+			
+			function donothing() {
+			// literally does nothing
+			}
+		
+			function first_shot() {
+			firstclick = true;
+			}
+			
+			function clear_first_shot() {
+			firstclick = false;
+			}
+			function resetlight() {
+				light.intensity = 0;
+				light2.intensity = 0;
+			}
+			
+				function gunfire() {
+				light.intensity = 0.3;
+				light2.intensity = 1;
+			}
+			
+			function keypress(event){
+				
+				var theKeyCode=event.keyCode; 
+				
+				if(theKeyCode==77){ //M for MUTE
+					if(muted){
+						music.play();
+						muted = false;
+					}else{
+						music.pause();
+						muted = true;
+					}
+				}	
+
+			}
+				
+
+		</script>
+
+	</body>
+</html>

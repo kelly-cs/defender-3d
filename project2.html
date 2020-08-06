@@ -1,0 +1,196 @@
+<!DOCTYPE  html>
+<html>
+<head>
+<p>Project2.html - Christopher Kelly</p>
+<script id="vertex-shader" type="x-shader/x-vertex">
+	
+	//THESE DO NOT PERTAIN TO LIGHTING? JUST THE OBJECT
+	//precision mediump float;
+	attribute vec4 vertexPosition;
+	attribute vec3 nv; // normal vector 
+		
+		//uniforms for modelview, modelview inverse transpose
+		uniform mat4 M, M_inversetranspose, P_orth, P_persp;
+		uniform float orthIsOn;
+		uniform vec3 ka, kd, ks;
+		uniform vec3 ka2, kd2, ks2;
+		uniform float alpha;
+		uniform float alpha2;
+	
+	
+	//COPYPASTE FOR SECOND LIGHT?
+	// see https://moodle.clarkson.edu/pluginfile.php/519306/mod_resource/content/3/11_LightingContinued.pdf
+	// Ambient = Specify intensity Ia.
+	// Point Light = specify p0 (done here) and intensity (Ia) at point p0 (done here).
+	// Spotlight = Specify point p0, and intensity (Ipo) at point p0, direction of spotlight axis u,
+	// and exponent e.
+	// 
+	uniform vec3 p0; // light one - POINT LIGHT. 
+	uniform vec3 p1; // light two
+	
+	
+	//COPYPASTE FOR SECOND LIGHT?
+	uniform vec3 Ia, Id, Is;
+	uniform vec3 Ia2, Id2, Is2;
+	
+	varying vec3 R;
+		void main() {
+			gl_PointSize = 1.0;
+			
+			//transform your vertices by the modelview matrix
+			vec4 vertexPositionTransformed = M * vertexPosition;
+			
+			vec4 nv4 = vec4( nv.x, nv.y, nv.z, 1.0);
+			vec4 nv4transformed = M_inversetranspose * nv4;
+			vec3 nvtransformed = normalize(nv4transformed.xyz);
+			
+			
+			
+			
+			
+			//get reflectioin for light source #1
+			float distance = length(p0 - vertexPositionTransformed.xyz);
+			
+			float a = .00005;
+			float b = .0;
+			float c = .0;
+			float scalefactor = a * distance * distance + b * distance + c;
+			
+			//get reflectioin for light source #2
+			float distance2 = length(p1 - vertexPositionTransformed.xyz);
+			
+			float a2 = .00005;
+			float b2 = .0;
+			float c2 = .0;
+			float scalefactor2 = a2 * distance2 * distance2 + b2 * distance2 + c2;
+			float spotlight_axis_u;
+			
+			vec3 Ia_pp0 = Ia / scalefactor;
+			vec3 Id_pp0 = Id / scalefactor;
+			vec3 Is_pp0 = Is / scalefactor;
+			
+			
+			//diffuse reflection
+			vec3 i = normalize( p0 - vertexPositionTransformed.xyz );
+			vec3 i2 = (vertexPositionTransformed.xyz-p1)/normalize( vertexPositionTransformed.xyz - p1);
+
+			//COPYPASTE FOR SECOND LIGHT?
+			vec3 Ia_pp1 = (Ia2 / scalefactor2);
+			vec3 Id_pp1 = (Id2 / scalefactor2);
+			vec3 Is_pp1 = (Is2 / scalefactor2);
+			
+			vec3 Ra, Rd, Rs;
+			vec3 Ra2, Rd2, Rs2;
+			
+			// Ambient reflection
+			Ra.r = ka.r * Ia_pp0.r;
+			Ra.g = ka.g * Ia_pp0.g;
+			Ra.b = ka.b * Ia_pp0.b;
+			
+			// Ambient reflection light 2
+			Ra2.r = ka2.r * Ia_pp1.r;
+			Ra2.g = ka2.g * Ia_pp1.g;
+			Ra2.b = ka2.b * Ia_pp1.b;
+			
+
+			// costheta1 will contain dot product between incident direction
+			// and transformed normal
+			//BRIGHTNESS?
+			float costheta = dot(i,nvtransformed);
+			Rd.r = kd.r * Id_pp0.r * max(costheta,0.0);
+			Rd.g = kd.r * Id_pp0.g * max(costheta,0.0);
+			Rd.b = kd.r * Id_pp0.b * max(costheta,0.0);
+			
+			//BRIGHTNESS?
+			float costheta2 = dot(i2,nvtransformed);
+			Rd2.r = kd2.r * Id_pp1.r * max(costheta2,0.0);
+			Rd2.g = kd2.r * Id_pp1.g * max(costheta2,0.0);
+			Rd2.b = kd2.r * Id_pp1.b * max(costheta2,0.0);
+			
+			//Specular Reflection
+			// Reflection vector
+			vec3 r = 2.0 * costheta * nvtransformed - i;
+			vec3 r2 = 2.0 * costheta2 * nvtransformed - i2;
+			
+			// View vector
+			vec3 view = normalize(vec3(.0,.0,.0)-vertexPositionTransformed.xyz);
+			//cosphi1 contains dot product between reflection vector
+			// and view vector
+			float cosphi = dot(r,view);
+			float cosphi2 = dot(r2,view);
+			float shine = pow( max( cosphi, 0.0 ), alpha );
+			float shine2 = pow( max( cosphi2, 0.0 ), alpha2);
+			float account;
+			float account2;
+			
+			if ( costheta > 0.0 ) {
+				account = 1.0;
+			} else {
+				account = 0.0;
+			}
+			
+			if ( costheta2 > 0.0 ) {
+				account2 = 1.0;
+			} else {
+				account2 = 0.0;
+			}
+			
+			Rs.r = ks.r * Is_pp0.r * shine * account;
+			Rs.g = ks.g * Is_pp0.g * shine * account;
+			Rs.b = ks.b * Is_pp0.b * shine * account;
+			
+			Rs2.r = ks2.r * Is_pp1.r * shine2 * account2;
+			Rs2.g = ks2.g * Is_pp1.g * shine2 * account2;
+			Rs2.b = ks2.b * Is_pp1.b * shine2 * account2;
+			
+			// Add all the ambient, diffuse, and specular reflections from all the light sources together
+			R = clamp(Ra + Ra2 + Rs + Rs2 + Rd + Rd2, 0.0, 1.0);
+			
+			if ( orthIsOn > 0.5) {
+				gl_Position = P_orth * vertexPositionTransformed;
+				} else{
+				gl_Position = P_persp * vertexPositionTransformed;
+				}
+			
+			
+		}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+
+	precision mediump float;
+	varying vec3 R;
+	void main() {
+		gl_FragColor = vec4(R.r, R.g, R.b, 1.0 );
+		}
+</script>
+
+  <body onload="initGL()" onKeyDown="moveSquareUsingKeys(event)">
+        <canvas id="gl-canvas" width="512" height="512" onclick="moveSquare">
+		CANVAS IS NOT WORKING ??????????????????????????????? 
+		</canvas>
+		<div>
+		<button id="orthoButton" onclick="showOrthographic()">
+			Orthographic
+			</button>
+			<button id="perspButton" onclick="showPerspective()">
+			Perspective
+			</button>
+		<button id="toggleRotate" onclick="toggleLight1()">
+		Toggle Spotlight 1
+		</button>
+		<button id="toggleRotate" onclick="toggleLight2()">
+		Toggle Ambient/Point Light 2
+		</button>
+		<button id="toggleSpecular" onclick="toggleSpecular()">
+		Toggle Specular Components
+		</button>
+		</div>
+
+<script type="text/javascript" src="Common/webgl-utils.js"></script>
+<script type="text/javascript" src="Common/initShaders.js"></script>
+<script type="text/javascript" src="Common/MV.js"></script>
+<script type="text/javascript" src="project2.js"></script>
+<script type="text/javascript" src="object.js"></script>
+</head>
+</html>
